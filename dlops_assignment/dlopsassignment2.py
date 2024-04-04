@@ -6,10 +6,10 @@ from torchvision import datasets, transforms
 from sklearn.metrics import confusion_matrix, precision_score, recall_score
 from torch.utils.tensorboard import SummaryWriter
 
-# Define the CNN architecture
-class CNN(nn.Module):
+# Define the CNN architecture for configuration 1
+class CNN1(nn.Module):
     def __init__(self):
-        super(CNN, self).__init__()
+        super(CNN1, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
@@ -20,6 +20,42 @@ class CNN(nn.Module):
         x = self.pool(nn.functional.relu(self.conv1(x)))
         x = self.pool(nn.functional.relu(self.conv2(x)))
         x = x.view(-1, 64 * 7 * 7)
+        x = nn.functional.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+# Define the CNN architecture for configuration 2
+class CNN2(nn.Module):
+    def __init__(self):
+        super(CNN2, self).__init__()
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.fc1 = nn.Linear(32 * 7 * 7, 64)
+        self.fc2 = nn.Linear(64, 10)
+
+    def forward(self, x):
+        x = self.pool(nn.functional.relu(self.conv1(x)))
+        x = self.pool(nn.functional.relu(self.conv2(x)))
+        x = x.view(-1, 32 * 7 * 7)
+        x = nn.functional.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+# Define the CNN architecture for configuration 3
+class CNN3(nn.Module):
+    def __init__(self):
+        super(CNN3, self).__init__()
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.fc1 = nn.Linear(128 * 7 * 7, 256)
+        self.fc2 = nn.Linear(256, 10)
+
+    def forward(self, x):
+        x = self.pool(nn.functional.relu(self.conv1(x)))
+        x = self.pool(nn.functional.relu(self.conv2(x)))
+        x = x.view(-1, 128 * 7 * 7)
         x = nn.functional.relu(self.fc1(x))
         x = self.fc2(x)
         return x
@@ -42,82 +78,44 @@ batch_size = 64
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-# Initialize the model
-model = CNN()
+# Define hyperparameters for configuration 1
+num_epochs_config1 = 5
+lr_config1 = 0.001
+optimizer_config1 = optim.Adam
 
-# Define loss function and optimizer
+# Define hyperparameters for configuration 2
+num_epochs_config2 = 10
+lr_config2 = 0.0005
+optimizer_config2 = optim.SGD
+
+# Define hyperparameters for configuration 3
+num_epochs_config3 = 8
+lr_config3 = 0.0001
+optimizer_config3 = optim.AdamW
+
+# Initialize the models
+model1 = CNN1()
+model2 = CNN2()
+model3 = CNN3()
+
+# Define loss function
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# TensorBoard writer
-writer = SummaryWriter()
+# TensorBoard writers for each configuration
+writer1 = SummaryWriter(log_dir='logs/config1')
+writer2 = SummaryWriter(log_dir='logs/config2')
+writer3 = SummaryWriter(log_dir='logs/config3')
 
-# Training loop
-num_epochs = 5
-for epoch in range(num_epochs):
-    model.train()
-    running_loss = 0.0
-    correct = 0
-    total = 0
+# Training loop for configuration 1
+train_model(model1, train_loader, test_loader, criterion, optimizer_config1, num_epochs_config1, writer1)
 
-    for i, (images, labels) in enumerate(train_loader):
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-        running_loss += loss.item()
+# Training loop for configuration 2
+train_model(model2, train_loader, test_loader, criterion, optimizer_config2, num_epochs_config2, writer2)
 
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+# Training loop for configuration 3
+train_model(model3, train_loader, test_loader, criterion, optimizer_config3, num_epochs_config3, writer3)
 
-    train_loss = running_loss / len(train_loader)
-    train_accuracy = 100 * correct / total
-
-    # Log training loss and accuracy
-    writer.add_scalar('Loss/train', train_loss, epoch)
-    writer.add_scalar('Accuracy/train', train_accuracy, epoch)
-
-    print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.2f}%")
-
-# Testing loop
-model.eval()
-test_correct = 0
-test_total = 0
-predicted_labels = []
-true_labels = []
-
-with torch.no_grad():
-    for images, labels in test_loader:
-        outputs = model(images)
-        _, predicted = torch.max(outputs.data, 1)
-        test_total += labels.size(0)
-        test_correct += (predicted == labels).sum().item()
-        predicted_labels.extend(predicted.numpy())
-        true_labels.extend(labels.numpy())
-
-test_accuracy = 100 * test_correct / test_total
-print(f"Test Accuracy: {test_accuracy:.2f}%")
-
-# Log test accuracy
-writer.add_scalar('Accuracy/test', test_accuracy, 0)
-
-# Compute confusion matrix
-conf_matrix = confusion_matrix(true_labels, predicted_labels)
-print("Confusion Matrix:")
-print(conf_matrix)
-
-# Compute precision and recall
-precision = precision_score(true_labels, predicted_labels, average='macro')
-recall = recall_score(true_labels, predicted_labels, average='macro')
-
-print(f"Precision: {precision:.4f}")
-print(f"Recall: {recall:.4f}")
-
-# Log precision and recall
-writer.add_scalar('Precision', precision, 0)
-writer.add_scalar('Recall', recall, 0)
-
-# Close the TensorBoard writer
-writer.close()
+# Close the TensorBoard writers
+writer1.close()
+writer2.close()
+writer3.close()
