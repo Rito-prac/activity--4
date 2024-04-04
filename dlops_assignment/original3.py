@@ -1,4 +1,4 @@
-#code with error not original.
+#changed to original
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -20,8 +20,8 @@ class CNN(nn.Module):
         x = self.pool(nn.functional.relu(self.conv1(x)))
         x = self.pool(nn.functional.relu(self.conv2(x)))
         x = x.view(-1, 64 * 7 * 7)
-        # Introduce an error by changing the activation function of fc1
-        x = nn.functional.sigmoid(self.fc1(x))
+        # Replace nn.functional.sigmoid with nn.functional.relu
+        x = nn.functional.relu(self.fc1(x))
         x = self.fc2(x)
         return x
 
